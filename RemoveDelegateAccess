@@ -1,0 +1,40 @@
+# RemoveDelegateAccess
+# Script to remove SpecialAccess ADPermission on Manager Mailbox, when we have a bad ACE table
+# where Remove-ADPermission cmdlet fails.
+# This script removes all permissions of Delegate on Manager.
+#
+# Usage:
+# 
+# .\RemoveDelegateAccess "CN=Manager,CN=Users,DC=contoso,DC=com" "CN=Delegate,CN=Users,DC=contoso,DC=com"
+ 
+[CmdletBinding()]
+Param(
+  [Parameter(Mandatory=$True,Position=1)]
+   [string]$ManagerDN,
+          
+   [Parameter(Mandatory=$True,Position=2)]
+   [string]$DelegateDN
+)
+ 
+$ManagerDN
+$DelegateDN
+ 
+Import-Module activedirectory
+Set-Location AD:
+ 
+$DelegateSID = (Get-ADUser -Identity $DelegateDN).SID
+$Temp = New-Object System.Security.Principal.SecurityIdentifier ($DelegateSID)
+$DelegateNTAcc = $Temp.Translate([System.Security.Principal.NTAccount])
+$DelegateNTAcc.Value
+ 
+$ManagerACE = (Get-Acl $ManagerDN).Access
+$ACEtobeRemoved = $ManagerACE | ?{$_.IdentityReference -eq $DelegateNTAcc.Value}
+ 
+$ACEtobeRemoved 
+ 
+$ManagerACL = new-object System.DirectoryServices.ActiveDirectorySecurity
+$ManagerACL = Get-Acl $ManagerDN
+ 
+$ManagerACL.RemoveAccessRule($ACEtobeRemoved)
+ 
+Set-Acl $ManagerDN -AclObject $ManagerACL
